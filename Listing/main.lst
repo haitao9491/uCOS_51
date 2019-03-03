@@ -1,0 +1,110 @@
+C51 COMPILER V9.01   MAIN                                                                  05/31/2012 16:28:17 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Output\main.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE APP\main.c LARGE BROWSE DEBUG OBJECTEXTEND PRINT(.\Listing\main.lst) OBJECT
+                    -(.\Output\main.obj)
+
+line level    source
+
+   1          /**
+   2           *      uCOS_51 for MCS-51
+   3           *      获取和设置系统时间
+   4           *     OSTimeGet(); 获取系统时间
+   5           *     OSTimeSet( ); 设置系统时间
+   6           *    2012-5-31     lzy
+   7           */
+   8          
+   9          #include "..\ucos_51\ucos-ii\inc\includes.h"
+  10          
+  11          // 任务优先级别定义 
+  12          #define APPSTARTPRIO    TASK_START_PRIO
+  13          #define POWERLEDPRIO    OS_LOWEST_PRIO - 2              // 定义灯为最低优先级别 【空闲任务】
+  14          
+  15          sbit WorkLedCtrl=P3^4;  // 灯引脚定义
+  16          
+  17          
+  18          // 栈定义
+  19          OS_STK AppStartStk[TASK_STK_SIZE];
+  20          OS_STK PowerLedStk[TASK_STK_SIZE];
+  21          
+  22          // 任务声明
+  23          void AppStart(void *ppdata) REENTRANT;
+  24          void PowerLed(void *ppdata) REENTRANT;          // 工作指示灯任务
+  25          
+  26          int  main()
+  27          {
+  28   1              InitSystem();     // 系统初始化
+  29   1      
+  30   1              OSTaskCreate(AppStart, (void *)0, AppStartStk, APPSTARTPRIO);
+  31   1      
+  32   1              
+  33   1              OSStart(); // 启动多任务管理
+  34   1      
+  35   1              return 0;
+  36   1      }
+  37          
+  38            
+  39          /*
+  40          ********************************************************************************************************* 
+  41          *                                             系统开始任务
+  42          *
+  43          * 描述       : 开定时器T0中断，创建消息邮箱以及所有其他的任务，然后自我删除。
+  44          *
+  45          * 参数       : ppdata
+  46          *
+  47          * 注意       : 系统启动后第一时间开定时器中断，否则系统其它任务无法得到执行。                                           
+  48          *********************************************************************************************************
+  49          */
+  50          void AppStart(void *ppdata) REENTRANT
+  51          {
+  52   1              ppdata=ppdata;
+  53   1      
+  54   1              ET0=1; /* 谨记：系统启动后第一时间开定时器中断 */
+C51 COMPILER V9.01   MAIN                                                                  05/31/2012 16:28:17 PAGE 2   
+
+  55   1              
+  56   1              OSTaskCreate(PowerLed, (void *)0, PowerLedStk, POWERLEDPRIO);
+  57   1      
+  58   1              OSTaskDel(OS_PRIO_SELF);        // 自我删除     
+  59   1      }
+  60          
+  61          
+  62          // 灯闪烁任务
+  63          void PowerLed(void *ppdata) REENTRANT
+  64          {
+  65   1      #if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
+                  OS_CPU_SR  cpu_sr;
+              #endif
+  68   1      
+  69   1              ppdata=ppdata;
+  70   1      
+  71   1              for(;;)
+  72   1              {
+  73   2                      if(OSTimeGet() == 10)
+  74   2                      {
+  75   3                              OS_ENTER_CRITICAL();
+  76   3                              WorkLedCtrl=!WorkLedCtrl; /* 保护临界资源 */
+  77   3                              OS_EXIT_CRITICAL();
+  78   3      
+  79   3                              OSTimeSet(0);
+  80   3                      }
+  81   2              //      OSTimeDlyHMSM(0,0,1,0);
+  82   2              }
+  83   1      }
+  84          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    201    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   1024    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

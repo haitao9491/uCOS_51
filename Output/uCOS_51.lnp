@@ -1,0 +1,10 @@
+".\Output\STARTUP.obj",
+".\Output\OS_CPU_A.obj",
+".\Output\OS_CPU_C.obj",
+".\Output\uCOS_II.obj",
+".\Output\serial.obj",
+".\Output\system.obj",
+".\Output\main.obj" 
+TO ".\Output\uCOS_51" 
+PRINT(".\Listing\uCOS_51.m51") RAMSIZE(256) 
+XDATA( 0X0000-0XFFFE )

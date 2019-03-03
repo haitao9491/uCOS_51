@@ -1,0 +1,301 @@
+C51 COMPILER V9.01   OS_CPU_C                                                              05/31/2012 16:28:16 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE OS_CPU_C
+OBJECT MODULE PLACED IN .\Output\OS_CPU_C.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE uCOS-II\MCS-51\OS_CPU_C.C LARGE BROWSE DEBUG OBJECTEXTEND PRINT(.\Listing\O
+                    -S_CPU_C.lst) OBJECT(.\Output\OS_CPU_C.obj)
+
+line level    source
+
+   1          /*
+   2          *********************************************************************************************************
+   3          *                                                uC/OS-II
+   4          *                                          The Real-Time Kernel
+   5          *
+   6          *                          (c) Copyright 1992-2002, Jean J. Labrosse, Weston, FL
+   7          *                                           All Rights Reserved
+   8          *
+   9          *
+  10          *                                           uCOS_51 for MCS-51
+  11          *
+  12          * File : OS_CPU_C.C
+  13          * Created by : QQ 591881218
+  14          *********************************************************************************************************
+  15          */
+  16          
+  17          #define  OS_CPU_GLOBALS
+  18          
+  19          #include "..\ucos_51\ucos-ii\inc\includes.h"
+  20          
+  21          /*
+  22          *********************************************************************************************************
+  23          *                                             初始化任务栈
+  24          *
+  25          * 描述       : 本函数为OSTaskCreate()和OSTaskCreateExt()函数所调用，用于任务栈的初始化。初始化后的任务栈
+  26          *                          看起来像刚刚发生过一次中断并将所有的寄存器都保存进了堆栈的情形一样。
+  27          *
+  28          * 参数       : task             任务代码的指针。
+  29          *
+  30          *                          ppdata       当任务开始执行时传递给任务的参数的指针。
+  31          *
+  32          *                          ptos         分配给任务堆栈的栈顶指针。
+  33          *
+  34          *                          opt          用于设定OSTaskCreateExt()的选项，指定是否允许堆栈检验，是否将堆栈清零，是否进行
+  35          *                                               浮点操作等。当用OSTaskCreate()函数调用时，设置为0。
+  36          *
+  37          * 返回值         : 返回栈顶指针
+  38          * 
+  39          * 注意       : 任务栈结构示意图(杨屹)
+  40          *
+  41          *                                    ---------- -
+  42          *                 用户栈最高地址---->|        | |
+  43          *                                    ---------- |
+  44          *                                    |   ...  | 仿真堆栈空间
+  45          *----------                          ---------- | 每任务一个
+  46          *|OSTCBCur|               ?C_XBP---->|        | | KEIL自动处理
+  47          *----------                          ---------- -
+  48          *    |                               |空闲间隔|
+  49          *    |     -----------------------   ----------                           ----------
+  50          *    \---->|OSTCBCur->OSTCBStkPtr|   |?C_XBP低|                    SP---->|        |
+  51          *          -----------------------   ----------                           ----------
+  52          *                     |              |?C_XBP高|                           |        |
+  53          *                     |              ---------- -                         ----------
+  54          *                     |              |        | |                         |   .    |
+C51 COMPILER V9.01   OS_CPU_C                                                              05/31/2012 16:28:16 PAGE 2   
+
+  55          *                     |              ---------- |                         |   .    |
+  56          *                     |              |        | |                         |   .    |
+  57          *                     |              ---------- |                         ----------
+  58          *                     |              |   .    |长度                       |        | +1
+  59          *                     |              |   .    | |                         ----------
+  60          *                     |              |   .    | |             OSStack---->|        | 0
+  61          *                     |              ---------- |                         ----------
+  62          *                     |              |        | |          OSStkStart---->| 不关心 | -1  低地址
+  63          *                     |              ---------- -                         ----------
+  64          *                     \------------->|  长度  | 低地址                   系统硬件堆栈
+  65          *                                    ----------
+  66          *                                     用户堆栈                        长度=SP-OSStkStart
+  67          *********************************************************************************************************
+  68          */
+  69          void *OSTaskStkInit(void(*task)(void *pd), void *ppdata, void *ptos, INT16U opt) REENTRANT
+  70          {
+  71   1              OS_STK *stk;
+  72   1              ppdata=ppdata;
+  73   1              opt       =opt;                                         /* opt没被用到，保留此语句防止警告产生                  */
+  74   1              stk       =(OS_STK *)ptos;                      /* 任务堆栈最低有效地址                                                 */
+  75   1              *stk++=15;                                              /* 任务堆栈长度                                                                 */
+  76   1              *stk++=(INT16U)task & 0xFF;             /* 任务代码地址低8位                                                    */
+  77   1              *stk++=(INT16U)task >> 8;               /* 任务代码地址高8位                                                    */
+  78   1              /* 处理器是按特定的顺序将寄存器存入堆栈的，所以用户在将寄存器存入堆栈的时候也要依照这一顺序 */
+  79   1              *stk++=0x00;                                    /* PSW                                                                                  */
+  80   1              *stk++=0x0A;                                    /* ACC                                                                                  */
+  81   1              *stk++=0x0B;                                    /* B                                                                                    */
+  82   1              *stk++=0x00;                                    /* DPL                                                                                  */
+  83   1              *stk++=0x00;                                    /* DPH                                                                                  */
+  84   1              *stk++=0x00;                                    /* R0                                                                                   */
+  85   1              *stk++=0x01;                                    /* R1                                                                                   */
+  86   1              *stk++=0x02;                                    /* R2                                                                                   */
+  87   1              *stk++=0x03;                                    /* R3                                                                                   */      
+  88   1              *stk++=0x04;                                    /* R4                                                                                   */
+  89   1              *stk++=0x05;                                    /* R5                                                                                   */
+  90   1              *stk++=0x06;                                    /* R6                                                                                   */
+  91   1              *stk++=0x07;                                    /* R7                                                                                   */
+  92   1              /* 不用保存SP，任务切换时根据用户堆栈长度计算得出                                                               */
+  93   1              *stk++=(INT16U)(ptos+MAX_STK_SIZE) >> 8;        /* ?C_XBP 仿真堆栈指针高8位             */
+  94   1              *stk++=(INT16U)(ptos+MAX_STK_SIZE) & 0xFF;      /* ?C_XBP 仿真堆栈低8位                         */
+  95   1              return ((void *)ptos);  /* 返回最低地址，这里不用弹出栈顶指针是为了提高计算效率 */
+  96   1      }
+  97          
+  98          /*********************************************** 钩子函数 ***********************************************/
+  99          
+ 100          #if OS_CPU_HOOKS_EN
+ 101          /*
+ 102          *********************************************************************************************************
+ 103          *                                       OS INITIALIZATION HOOK
+ 104          *                                            (BEGINNING)
+ 105          *
+ 106          * Description: This function is called by OSInit() at the beginning of OSInit().
+ 107          *
+ 108          * Arguments  : none
+ 109          *
+ 110          * Note(s)    : 1) Interrupts should be disabled during this call.
+ 111          *********************************************************************************************************
+ 112          */
+ 113          #if OS_VERSION > 203
+ 114          void OSInitHookBegin (void)
+ 115          {
+ 116   1      }
+C51 COMPILER V9.01   OS_CPU_C                                                              05/31/2012 16:28:16 PAGE 3   
+
+ 117          #endif
+ 118          
+ 119          /*
+ 120          *********************************************************************************************************
+ 121          *                                       OS INITIALIZATION HOOK
+ 122          *                                               (END)
+ 123          *
+ 124          * Description: This function is called by OSInit() at the end of OSInit().
+ 125          *
+ 126          * Arguments  : none
+ 127          *
+ 128          * Note(s)    : 1) Interrupts should be disabled during this call.
+ 129          *********************************************************************************************************
+ 130          */
+ 131          #if OS_VERSION > 203
+ 132          void OSInitHookEnd (void)
+ 133          {
+ 134   1      }
+ 135          #endif
+ 136          
+ 137          /*
+ 138          *********************************************************************************************************
+ 139          *                                          TASK CREATION HOOK
+ 140          *
+ 141          * Description: This function is called when a task is created.
+ 142          *
+ 143          * Arguments  : ptcb   is a pointer to the task control block of the task being created.
+ 144          *
+ 145          * Note(s)    : 1) Interrupts are disabled during this call.
+ 146          *********************************************************************************************************
+ 147          */
+ 148          void OSTaskCreateHook (OS_TCB *ptcb) REENTRANT
+ 149          {
+ 150   1          ptcb = ptcb;                       /* Prevent compiler warning                                     */
+ 151   1      }
+ 152          
+ 153          /*
+ 154          *********************************************************************************************************
+ 155          *                                           TASK DELETION HOOK
+ 156          *
+ 157          * Description: This function is called when a task is deleted.
+ 158          *
+ 159          * Arguments  : ptcb   is a pointer to the task control block of the task being deleted.
+ 160          *
+ 161          * Note(s)    : 1) Interrupts are disabled during this call.
+ 162          *********************************************************************************************************
+ 163          */
+ 164          void OSTaskDelHook (OS_TCB *ptcb) REENTRANT
+ 165          {
+ 166   1          ptcb = ptcb;                       /* Prevent compiler warning                                     */
+ 167   1      }
+ 168          
+ 169          /*
+ 170          *********************************************************************************************************
+ 171          *                                           TASK SWITCH HOOK
+ 172          *
+ 173          * Description: This function is called when a task switch is performed.  This allows you to perform other
+ 174          *              operations during a context switch.
+ 175          *
+ 176          * Arguments  : none
+ 177          *
+ 178          * Note(s)    : 1) Interrupts are disabled during this call.
+C51 COMPILER V9.01   OS_CPU_C                                                              05/31/2012 16:28:16 PAGE 4   
+
+ 179          *              2) It is assumed that the global pointer 'OSTCBHighRdy' points to the TCB of the task that
+ 180          *                 will be 'switched in' (i.e. the highest priority task) and, 'OSTCBCur' points to the 
+ 181          *                 task being switched out (i.e. the preempted task).
+ 182          *********************************************************************************************************
+ 183          */
+ 184          void OSTaskSwHook (void) REENTRANT
+ 185          {
+ 186   1      }
+ 187          
+ 188          /*
+ 189          *********************************************************************************************************
+ 190          *                                           STATISTIC TASK HOOK
+ 191          *
+ 192          * Description: This function is called every second by uC/OS-II's statistics task.  This allows your 
+ 193          *              application to add functionality to the statistics task.
+ 194          *
+ 195          * Arguments  : none
+ 196          *********************************************************************************************************
+ 197          */
+ 198          void OSTaskStatHook (void) REENTRANT
+ 199          {
+ 200   1      }
+ 201          
+ 202          /*
+ 203          *********************************************************************************************************
+ 204          *                                           OSTCBInit() HOOK
+ 205          *
+ 206          * Description: This function is called by OSTCBInit() after setting up most of the TCB.
+ 207          *
+ 208          * Arguments  : ptcb    is a pointer to the TCB of the task being created.
+ 209          *
+ 210          * Note(s)    : 1) Interrupts may or may not be ENABLED during this call.
+ 211          *********************************************************************************************************
+ 212          */
+ 213          #if OS_VERSION > 203
+ 214          void OSTCBInitHook (OS_TCB *ptcb) REENTRANT
+ 215          {
+ 216   1          ptcb = ptcb;                                           /* Prevent Compiler warning                 */
+ 217   1      }
+ 218          #endif
+ 219          
+ 220          /*
+ 221          *********************************************************************************************************
+ 222          *                                               TICK HOOK
+ 223          *
+ 224          * Description: This function is called every tick.
+ 225          *
+ 226          * Arguments  : none
+ 227          *
+ 228          * Note(s)    : 1) Interrupts may or may not be ENABLED during this call.
+ 229          *********************************************************************************************************
+ 230          */
+ 231          
+ 232          void OSTimeTickHook (void) REENTRANT
+ 233          {
+ 234   1      }
+ 235          
+ 236          /*
+ 237          *********************************************************************************************************
+ 238          *                                             IDLE TASK HOOK
+ 239          *
+ 240          * Description: This function is called by the idle task.  This hook has been added to allow you to do  
+C51 COMPILER V9.01   OS_CPU_C                                                              05/31/2012 16:28:16 PAGE 5   
+
+ 241          *              such things as STOP the CPU to conserve power.
+ 242          *
+ 243          * Arguments  : none
+ 244          *
+ 245          * Note(s)    : 1) Interrupts are enabled during this call.
+ 246          *********************************************************************************************************
+ 247          */
+ 248          #if OS_VERSION >= 251
+ 249          void OSTaskIdleHook (void) REENTRANT
+ 250          {
+ 251   1      }
+ 252          #endif
+ 253          
+ 254          #endif
+ 255          
+ 256          /********************************************************************************************************/
+ 257          
+ 258          /* 初始化定时器0，用于产生时钟节拍 */
+ 259          void InitTimer0(void) REENTRANT
+ 260          {
+ 261   1          TMOD=TMOD&0xF0;
+ 262   1          TMOD=TMOD|0x01;     /* 模式1(16位定时器)，仅受TR0控制 */
+ 263   1              TH0=TIMER_20MS_TH0;
+ 264   1              TL0=TIMER_20MS_TL0;
+ 265   1              EA=0; /* EA和ET0，51上电缺省值为0，EA将在OSStartHighRdy()中打开 */
+ 266   1              ET0=0; /* 满足在OSStart()前不产生时钟中断的要求，系统启动后第一时间开定时器T0中断 */    
+ 267   1              TR0=1;   
+ 268   1      }
+ 269          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    759    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
